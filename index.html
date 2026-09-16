@@ -1,0 +1,67 @@
+<form id="form-one" method="post" action="/one">
+  <input name="message" required>
+  <div id="captcha-one"></div>
+  <button type="submit">Send form one</button>
+</form>
+
+<form id="form-two" method="post" action="/two">
+  <input name="email" type="email" required>
+  <div id="captcha-two"></div>
+  <button type="submit">Send form two</button>
+</form>
+
+<script>
+const SITE_KEY = "YOUR_SITE_KEY";
+
+function wireCaptcha(formId, captchaId) {
+  const form = document.getElementById(formId);
+  let widgetId;
+  let waiting = false;
+
+  widgetId = grecaptcha.render(captchaId, {
+    sitekey: SITE_KEY,
+    size: "invisible",
+    callback(token) {
+      // Normally reCAPTCHA creates this field inside the form.
+      let field = form.querySelector('[name="g-recaptcha-response"]');
+      if (!field) {
+        field = document.createElement("input");
+        field.type = "hidden";
+        field.name = "g-recaptcha-response";
+        form.appendChild(field);
+      }
+      field.value = token;
+
+      // Bypass our submit listener after CAPTCHA succeeds.
+      HTMLFormElement.prototype.submit.call(form);
+    },
+    "expired-callback"() {
+      waiting = false;
+      grecaptcha.reset(widgetId);
+    },
+    "error-callback"() {
+      waiting = false;
+      console.error("reCAPTCHA failed for", formId);
+    }
+  });
+
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+
+    console.log("submit intercepted:", event.currentTarget.id,
+                "widget:", widgetId);
+
+    if (!form.reportValidity() || waiting) return;
+    waiting = true;
+    grecaptcha.execute(widgetId); // Critical: execute this form's widget.
+  });
+}
+
+function recaptchaLoaded() {
+  wireCaptcha("form-one", "captcha-one");
+  wireCaptcha("form-two", "captcha-two");
+}
+</script>
+<script
+  src="https://www.google.com/recaptcha/api.js?onload=recaptchaLoaded&render=explicit"
+  async defer></script>
